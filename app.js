@@ -2,17 +2,19 @@
 
 const express = require("express");
 const path = require("path");
-const session = require("express-session");
-const passport = require("passport");
-const LocalStrategy = require("passport-local").Strategy;
+const session = require("express-session"); //dependency used in background by passport.js
+const passport = require("passport"); //authentification middleware
+const LocalStrategy = require("passport-local").Strategy; //one of authentification strategies of PassportJS
 const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs"); // password encryptor
 const Schema = mongoose.Schema;
 
-const mongoDb = "mongodb+srv://jaeykos:Th35ulG9C2vSJZPV@cluster0.ixoh62k.mongodb.net/?retryWrites=true&w=majority";
+const mongoDb = "mongodb+srv://jaeykos:nItKZYVdxOqg38mo@cluster0.ixoh62k.mongodb.net/?retryWrites=true&w=majority";
 mongoose.connect(mongoDb, { useUnifiedTopology: true, useNewUrlParser: true });
 const db = mongoose.connection;
 db.on("error", console.error.bind(console, "mongo connection error"));
 
+//set up User model
 const User = mongoose.model(
   "User",
   new Schema({
@@ -21,10 +23,10 @@ const User = mongoose.model(
   })
 );
 
+//allow user to stay logged in; 
 passport.serializeUser((user, done) => {
   done(null, user.id);
 });
-
 passport.deserializeUser(async (id, done) => {
   try {
     const user = await User.findById(id);
@@ -34,11 +36,6 @@ passport.deserializeUser(async (id, done) => {
   };
 });
 
-const app = express();
-app.set("views", __dirname);
-app.set("view engine", "ejs");
-
-app.use(session({ secret: "cats", resave: false, saveUninitialized: true }));
 
 passport.use(
   new LocalStrategy(async (username, password, done) => {
@@ -47,15 +44,24 @@ passport.use(
       if (!user) {
         return done(null, false, { message: "Incorrect username" });
       };
-      if (user.password !== password) {
-        return done(null, false, { message: "Incorrect password" });
-      };
+      const match = await bcrypt.compare(password, user.password);
+      if (!match) {
+        // passwords do not match!
+        return done(null, false, { message: "Incorrect password" })
+      }
       return done(null, user);
     } catch (err) {
       return done(err);
     };
   })
 );
+
+const app = express();
+app.set("views", __dirname);
+app.set("view engine", "ejs");
+
+app.use(session({ secret: "cats", resave: false, saveUninitialized: true }));
+
 
 app.use(passport.initialize());
 app.use(passport.session());
@@ -66,14 +72,22 @@ app.get("/", (req, res) => {
 });
 app.get("/sign-up", (req, res) => res.render("sign-up-form"));
 
+
+
 app.post("/sign-up", async (req, res, next) => {
   try {
-    const user = new User({
-      username: req.body.username,
-      password: req.body.password
-    });
-    const result = await user.save();
-    res.redirect("/");
+    bcrypt.hash(req.body.password, 10, async (err, hashedPassword) => {
+      if (err) {
+        throw new Error("bycrypt did not work")
+      } else {
+        const user = new User({
+          username: req.body.username,
+          password: hashedPassword
+        });
+        const result = await user.save();
+        res.redirect("/");
+      }
+    })
   } catch (err) {
     return next(err);
   };
