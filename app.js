@@ -7,9 +7,12 @@ const passport = require("passport"); //authentification middleware
 const LocalStrategy = require("passport-local").Strategy; //one of authentification strategies of PassportJS
 const mongoose = require("mongoose");
 const bcrypt = require("bcryptjs"); // password encryptor
+const { env } = require("process");
 const Schema = mongoose.Schema;
+require('dotenv').config();
 
-const mongoDb = "mongodb+srv://jaeykos:nItKZYVdxOqg38mo@cluster0.ixoh62k.mongodb.net/?retryWrites=true&w=majority";
+
+const mongoDb = process.env.MONGODB_KEY;
 mongoose.connect(mongoDb, { useUnifiedTopology: true, useNewUrlParser: true });
 const db = mongoose.connection;
 db.on("error", console.error.bind(console, "mongo connection error"));
@@ -60,7 +63,7 @@ const app = express();
 app.set("views", __dirname);
 app.set("view engine", "ejs");
 
-app.use(session({ secret: "cats", resave: false, saveUninitialized: true }));
+app.use(session({ secret: process.env.SECRET_KEY, resave: false, saveUninitialized: true }));
 
 
 app.use(passport.initialize());
